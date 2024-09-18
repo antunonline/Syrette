@@ -152,9 +152,15 @@ mod test_utils;
 #[cfg(not(tarpaulin_include))]
 #[macro_export]
 macro_rules! di_container_bind {
+    ($implementation: ty, $di_container: ident) => {
+        $di_container.bind::<$implementation>().to::<$implementation>().unwrap();
+
+        syrette::declare_interface!($implementation -> $implementation);
+    };
     ($interface: path => $implementation: ty, $di_container: ident) => {
         $di_container.bind::<dyn $interface>().to::<$implementation>().unwrap();
 
         syrette::declare_interface!($implementation -> $interface);
     };
+
 }

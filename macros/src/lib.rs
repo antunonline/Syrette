@@ -60,7 +60,7 @@ const PACKAGE_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// #### `no_declare_concrete_interface`
 /// **Value:** boolean literal<br>
 /// **Default:** `false`<br>
-/// Disable declaring the concrete type as the interface when no interface trait argument
+/// Disable declaring the struct type as the interface when no interface trait argument
 /// is given.
 ///
 /// #### `async`
@@ -82,7 +82,7 @@ const PACKAGE_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// When no interface trait argument is given, you have three options
 /// - Manually declare the interface with the [`declare_interface!`] macro.
 /// - Use the [`di_container_bind`] macro to create a DI container binding.
-/// - Use the concrete type as the interface.
+/// - Use the struct type as the interface.
 ///
 /// # Examples
 /// ```
