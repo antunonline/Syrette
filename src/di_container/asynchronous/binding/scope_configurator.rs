@@ -1,9 +1,13 @@
 //! Scope configurator for a binding for types inside of a [`AsyncDIContainer`].
+
+use std::any::type_name;
 use std::marker::PhantomData;
 
 use crate::di_container::asynchronous::binding::when_configurator::AsyncBindingWhenConfigurator;
 use crate::di_container::BindingOptions;
-use crate::errors::async_di_container::AsyncBindingScopeConfiguratorError;
+use crate::errors::async_di_container::{AsyncBindingScopeConfiguratorError, AsyncDIContainerError};
+use crate::errors::injectable::InjectableError;
+use crate::errors::injectable::InjectableError::PrepareDependencyFailed;
 use crate::interfaces::async_injectable::AsyncInjectable;
 use crate::provider::r#async::{AsyncSingletonProvider, AsyncTransientTypeProvider};
 use crate::ptr::ThreadsafeSingletonPtr;
@@ -165,6 +169,125 @@ where
                 .await
                 .map_err(AsyncBindingScopeConfiguratorError::SingletonResolveFailed)?,
             );
+
+        self.di_container.set_binding::<Interface>(
+            BindingOptions::new(),
+            Box::new(AsyncSingletonProvider::new(singleton)),
+        );
+
+        Ok(AsyncBindingWhenConfigurator::new(self.di_container))
+    }
+
+
+    /// Configures the binding to be in a singleton scope, from existing binding.
+    ///
+    /// # Errors
+    /// Will return Err if resolving the implementation fails.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::sync::atomic::{AtomicBool, Ordering};
+    /// # use syrette::{AsyncDIContainer, injectable};
+    ///
+    /// # trait IAudioManager
+    /// # {
+    /// #    fn is_enabled() -> bool;
+    /// # }
+    /// #
+    /// # struct AudioManager
+    /// # {
+    /// #     is_sound_playing: AtomicBool
+    /// # }
+    /// #
+    /// # #[injectable(async = true)]
+    /// # impl AudioManager
+    /// # {
+    /// #     fn new() -> Self
+    /// #     {
+    /// #         Self { is_sound_playing: AtomicBool::new(false) }
+    /// #     }
+    /// #
+    /// #     fn play_long_sound(&self)
+    /// #     {
+    /// #         self.is_sound_playing.store(true, Ordering::Relaxed);
+    /// #     }
+    /// #
+    /// #     fn is_sound_playing(&self) -> bool
+    /// #     {
+    /// #        self.is_sound_playing.load(Ordering::Relaxed)
+    /// #     }
+    /// #
+    /// # }
+    /// # impl IAudioManager for AudioManager {
+    /// #  fn is_enabled() -> bool {
+    /// #    todo!()
+    /// #  }
+    /// # }
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut di_container = AsyncDIContainer::new();
+    ///
+    /// di_container
+    ///     .bind::<AudioManager>()
+    ///     .to::<AudioManager>()?
+    ///     .in_singleton_scope()
+    ///     .await;
+    /// di_container
+    ///     .bind::<dyn IAudioManager>()
+    ///     .to::<AudioManager>()?
+    ///     .in_singleton_scope_from_existing()
+    ///     .await;
+    ///
+    /// {
+    ///     let audio_manager = di_container
+    ///         .get::<AudioManager>()
+    ///         .await?
+    ///         .threadsafe_singleton()?;
+    ///
+    ///     let iaudio_manager = di_container
+    ///         .get::<dyn IAudioManager>()
+    ///         .await?
+    ///         .threadsafe_singleton()?;
+    ///
+    ///     audio_manager.play_long_sound();
+    /// }
+    ///
+    /// let audio_manager = di_container
+    ///     .get::<AudioManager>()
+    ///     .await?
+    ///     .threadsafe_singleton()?;
+    ///
+    /// assert!(audio_manager.is_sound_playing());
+    /// #
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn in_singleton_scope_from_existing(
+        self,
+    ) -> Result<
+        AsyncBindingWhenConfigurator<'di_container, Interface>,
+        AsyncBindingScopeConfiguratorError,
+    >
+    {
+        let singleton: ThreadsafeSingletonPtr<Implementation> =
+            self.di_container.get::<Implementation>()
+            .await
+            .map_err(|reason| AsyncBindingScopeConfiguratorError::SingletonResolveFailed(
+                InjectableError::AsyncResolveFailed {
+                    affected: type_name::<Implementation>(),
+                    reason: Box::new( reason )
+
+                }
+            ))?
+            .threadsafe_singleton()
+            .map_err(|reason| AsyncBindingScopeConfiguratorError::SingletonResolveFailed(
+                InjectableError::AsyncResolveFailed {
+                    affected: type_name::<Implementation>(),
+                    reason: Box::new( AsyncDIContainerError::SingletonPtrNotFound (reason, type_name::<Implementation>()))
+
+                }
+            ))?;
 
         self.di_container.set_binding::<Interface>(
             BindingOptions::new(),

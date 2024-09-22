@@ -3,6 +3,7 @@
 //! [`DIContainer`]: crate::di_container::blocking::DIContainer
 
 use crate::errors::injectable::InjectableError;
+use crate::errors::ptr::SomePtrError;
 
 /// Error type for [`DIContainer`].
 ///
@@ -48,6 +49,10 @@ pub enum DIContainerError
         /// The name of the binding if one exists.
         name: Option<String>,
     },
+
+    /// No binding exists for a interface (and optionally a name).
+    #[error("Singleton not found for type {1}. Please ensure such type exists registered as Singleton.")]
+    SingletonNotFound(SomePtrError, &'static str)
 }
 
 /// Error type for [`BindingBuilder`].

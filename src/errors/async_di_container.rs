@@ -3,6 +3,7 @@
 //! [`AsyncDIContainer`]: crate::di_container::asynchronous::AsyncDIContainer
 
 use crate::errors::injectable::InjectableError;
+use crate::errors::ptr::SomePtrError;
 
 /// Error type for [`AsyncDIContainer`].
 ///
@@ -52,6 +53,10 @@ pub enum AsyncDIContainerError
     /// A interface has not been marked async.
     #[error("Interface '{0}' has not been marked async")]
     InterfaceNotAsync(&'static str),
+
+    /// A pointer mismatch
+    #[error("Singleton for type '{1}' not found. Please ensure that such type is registered as ThreadSafeSingletonPtr.")]
+    SingletonPtrNotFound(SomePtrError, &'static str)
 }
 
 /// Error type for [`AsyncBindingBuilder`].

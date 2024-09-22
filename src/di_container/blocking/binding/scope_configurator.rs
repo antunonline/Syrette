@@ -1,9 +1,12 @@
 //! Scope configurator for a binding for types inside of a [`DIContainer`].
+
+use std::any::type_name;
 use std::marker::PhantomData;
 
 use crate::di_container::blocking::binding::when_configurator::BindingWhenConfigurator;
 use crate::di_container::BindingOptions;
-use crate::errors::di_container::BindingScopeConfiguratorError;
+use crate::errors::di_container::{BindingScopeConfiguratorError, DIContainerError};
+use crate::errors::injectable::InjectableError;
 use crate::interfaces::injectable::Injectable;
 use crate::provider::blocking::{SingletonProvider, TransientTypeProvider};
 use crate::ptr::SingletonPtr;
@@ -154,6 +157,112 @@ where
             )
             .map_err(BindingScopeConfiguratorError::SingletonResolveFailed)?,
         );
+
+        self.di_container.set_binding::<Interface>(
+            BindingOptions::new(),
+            Box::new(SingletonProvider::new(singleton)),
+        );
+
+        Ok(BindingWhenConfigurator::new(self.di_container))
+    }
+
+
+    /// Configures the binding to be in a singleton scope.
+    ///
+    /// # Errors
+    /// Will return Err if resolving the implementation fails.
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::sync::atomic::{AtomicBool, Ordering};
+    /// # use syrette::{DIContainer, injectable};
+    /// #
+    /// # struct AudioManager
+    /// # {
+    /// #     is_sound_playing: AtomicBool
+    /// # }
+    /// #
+    /// # trait IAudioManager
+    /// # {
+    /// #     fn is_enabled(&self) -> bool;
+    /// # }
+    /// #
+    /// # #[injectable]
+    /// # impl AudioManager
+    /// # {
+    /// #     fn new() -> Self
+    /// #     {
+    /// #         Self { is_sound_playing: AtomicBool::new(false) }
+    /// #     }
+    /// #
+    /// #     fn play_long_sound(&self)
+    /// #     {
+    /// #         self.is_sound_playing.store(true, Ordering::Relaxed);
+    /// #     }
+    /// #
+    /// #     fn is_sound_playing(&self) -> bool
+    /// #     {
+    /// #        self.is_sound_playing.load(Ordering::Relaxed)
+    /// #     }
+    /// #
+    /// # }
+    /// #
+    /// # impl IAudioManager for AudioManager {
+    /// #  fn is_enabled(&self) -> bool {
+    /// #    true
+    /// #  }
+    /// # }
+    /// #
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut di_container = DIContainer::new();
+    ///
+    /// di_container
+    ///     .bind::<AudioManager>()
+    ///     .to::<AudioManager>()?
+    ///     .in_singleton_scope();
+    ///
+    /// di_container
+    ///     .bind::<dyn IAudioManager>()
+    ///     .to::<AudioManager>()?
+    ///     .in_singleton_scope_from_existing();
+    ///
+    /// {
+    ///     let audio_manager = di_container.get::<AudioManager>()?.singleton()?;
+    ///     let i_audio_manager = di_container.get::<dyn IAudioManager>()?.singleton()?;
+    ///
+    ///     audio_manager.play_long_sound();
+    /// }
+    ///
+    /// let audio_manager = di_container.get::<AudioManager>()?.singleton()?;
+    ///
+    /// assert!(audio_manager.is_sound_playing());
+    /// #
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn in_singleton_scope_from_existing(
+        self,
+    ) -> Result<
+        BindingWhenConfigurator<'di_container, Interface>,
+        BindingScopeConfiguratorError,
+    >
+    {
+        let singleton: SingletonPtr<Implementation> =
+            self.di_container.get::<Implementation>()
+                .map_err(|reason| BindingScopeConfiguratorError::SingletonResolveFailed(
+                    InjectableError::ResolveFailed {
+                        affected: type_name::<Implementation>(),
+                        reason: Box::new( reason )
+
+                    }
+                ))?
+                .singleton()
+                .map_err(|reason| BindingScopeConfiguratorError::SingletonResolveFailed(
+                    InjectableError::ResolveFailed {
+                        affected: type_name::<Implementation>(),
+                        reason: Box::new( DIContainerError::SingletonNotFound (reason, type_name::<Implementation>()))
+                    }
+                ))?;
 
         self.di_container.set_binding::<Interface>(
             BindingOptions::new(),
