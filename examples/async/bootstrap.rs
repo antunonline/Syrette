@@ -5,10 +5,12 @@ use crate::animals::cat::Cat;
 use crate::animals::dog::Dog;
 use crate::animals::human::Human;
 use crate::food::Food;
+use crate::generics::{IPrinter, Printer, PrinterConfig, SomethingElse};
 use crate::interfaces::cat::ICat;
 use crate::interfaces::dog::IDog;
 use crate::interfaces::food::{IFood, IFoodFactory};
 use crate::interfaces::human::IHuman;
+use crate::singleton::{SomeSingleton, SomeTrait};
 
 pub async fn bootstrap() -> Result<AsyncDIContainer, anyhow::Error>
 {
@@ -37,6 +39,15 @@ pub async fn bootstrap() -> Result<AsyncDIContainer, anyhow::Error>
             food
         })
     })?;
+
+    di_container.bind::<SomethingElse>().to::<SomethingElse>()?;
+    di_container.bind::<PrinterConfig<String>>().to::<PrinterConfig<String>>()?;
+    di_container.bind::<Printer<String>>().to::<Printer<String>>()?;
+    di_container.bind::<dyn IPrinter<String>>().to::<Printer<String>>()?;
+
+    di_container.bind::<SomeSingleton>().to::<SomeSingleton>()?.in_singleton_scope().await?;
+    di_container.bind::<dyn SomeTrait>().to::<SomeSingleton>()?.in_singleton_scope_from_existing().await?;
+
 
     Ok(di_container)
 }
